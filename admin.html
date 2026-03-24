@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>View Responses</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      min-height: 100vh;
+      padding: 32px 20px;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #6e6e73;
+      margin-bottom: 24px;
+      font-size: 0.95rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #0071e3;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #0077ed; }
+
+    button.secondary {
+      background: #e8e8ed;
+      color: #1d1d1f;
+    }
+
+    button.secondary:hover { background: #d2d2d7; }
+
+    .count {
+      font-size: 0.85rem;
+      color: #6e6e73;
+      margin-bottom: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 0.88rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    th {
+      background: #1d1d1f;
+      color: #f5f5f7;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr:hover td { background: #fafafa; }
+
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a1a1a6;
+      font-size: 1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #e8f4fd;
+      color: #0071e3;
+    }
+
+    @media (max-width: 700px) {
+      table { font-size: 0.8rem; }
+      th, td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Availability Responses</h1>
+  <p class="subtitle">All submitted scheduling preferences.</p>
+
+  <div class="toolbar">
+    <button onclick="loadData()">Refresh Data</button>
+    <button class="secondary" onclick="exportCSV()">Export CSV</button>
+  </div>
+
+  <p class="count" id="count"></p>
+
+  <div id="tableWrap">
+    <p class="empty" id="loading">Loading responses...</p>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────
+  // Replace with your deployed Google Apps Script web app URL
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcQMmBqQSMV14mcjb8mJeQR2AIdJ0V2eloOSqlS2KHM4eoZeelG1wpmmFptWpjSCmL/exec';
+  // ────────────────────────────────────────────────────────
+
+  let allData = [];
+
+  function formatTime(val) {
+    if (!val) return '—';
+    const [h, m] = val.split(':').map(Number);
+    const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+  }
+
+  function formatDate(val) {
+    if (!val) return '—';
+    const [y, mo, d] = val.split('-');
+    const date = new Date(Number(y), Number(mo) - 1, Number(d));
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  async function loadData() {
+    document.getElementById('tableWrap').innerHTML = '<p class="empty">Loading responses...</p>';
+
+    try {
+      const res = await fetch(SCRIPT_URL);
+      const json = await res.json();
+      allData = json.data || [];
+      renderTable(allData);
+    } catch (err) {
+      document.getElementById('tableWrap').innerHTML =
+        '<p class="empty">Could not load data. Make sure the script URL is configured.</p>';
+    }
+  }
+
+  function renderTable(data) {
+    document.getElementById('count').textContent = `${data.length} response${data.length !== 1 ? 's' : ''}`;
+
+    if (data.length === 0) {
+      document.getElementById('tableWrap').innerHTML = '<p class="empty">No responses yet.</p>';
+      return;
+    }
+
+    let html = `<table>
+      <thead><tr>
+        <th>Name</th><th>Email</th>
+        <th>Choice 1</th><th>Choice 2</th><th>Choice 3</th>
+        <th>Submitted</th>
+      </tr></thead><tbody>`;
+
+    data.forEach(r => {
+      const c1 = `${formatDate(r.date1)} ${formatTime(r.time1)}`;
+      const c2 = `${formatDate(r.date2)} ${formatTime(r.time2)}`;
+      const c3 = r.date3 ? `${formatDate(r.date3)} ${formatTime(r.time3)}` : '<span style="color:#a1a1a6">—</span>';
+      const sub = r.submitted ? new Date(r.submitted).toLocaleDateString() : '—';
+      html += `<tr>
+        <td>${escHtml(r.name)}</td>
+        <td>${escHtml(r.email)}</td>
+        <td><span class="badge">${c1}</span></td>
+        <td><span class="badge">${c2}</span></td>
+        <td>${c3}</td>
+        <td>${sub}</td>
+      </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('tableWrap').innerHTML = html;
+  }
+
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+
+  function exportCSV() {
+    if (!allData.length) return;
+    const headers = ['Name', 'Email', 'Date 1', 'Time 1', 'Date 2', 'Time 2', 'Date 3', 'Time 3', 'Submitted'];
+    const rows = allData.map(r => [
+      r.name, r.email, r.date1, r.time1, r.date2, r.time2, r.date3 || '', r.time3 || '', r.submitted || ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'availability_responses.csv';
+    a.click();
+  }
+
+  loadData();
+</script>
+
+</body>
+</html>
