@@ -143,7 +143,18 @@
 
   function formatTime(val) {
     if (!val) return '—';
+    val = String(val);
+    // Handle ISO datetime from Sheets (e.g. "1899-12-30T03:30:00.000Z")
+    if (val.includes('T')) {
+      const d = new Date(val);
+      let h = d.getUTCHours(), m = d.getUTCMinutes();
+      const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+    // Handle "HH:MM" format
     const [h, m] = val.split(':').map(Number);
+    if (isNaN(h)) return val;
     const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
     const ampm = h >= 12 ? 'PM' : 'AM';
     return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
@@ -151,7 +162,15 @@
 
   function formatDate(val) {
     if (!val) return '—';
+    val = String(val);
+    // Handle ISO datetime from Sheets (e.g. "2026-05-10T00:00:00.000Z")
+    if (val.includes('T')) {
+      const d = new Date(val);
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+    }
+    // Handle "YYYY-MM-DD" format
     const [y, mo, d] = val.split('-');
+    if (isNaN(Number(y))) return val;
     const date = new Date(Number(y), Number(mo) - 1, Number(d));
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   }
